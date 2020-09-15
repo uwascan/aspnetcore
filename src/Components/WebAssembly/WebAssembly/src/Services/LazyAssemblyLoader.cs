@@ -91,19 +91,24 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Services
                 return loadedAssemblies;
             }
 
-            var assemblies = ((IJSUnmarshalledRuntime)_jsRuntime).InvokeUnmarshalled<object, object, object, object[]>(
+            var result = ((IJSUnmarshalledRuntime)_jsRuntime).InvokeUnmarshalled<object, object, object, Dictionary<string, byte[][]>>(
                 ReadDynamicAssemblies,
                 null,
                 null,
                 null);
 
-            foreach (byte[] assembly in assemblies)
+            var assemblies = result["assemblies"];
+            var pdbs = result["pdbs"];
+
+            for (int i = 0; i < assemblies.Length; i++)
             {
+                var assembly = assemblies[i];
+                var pdb = pdbs[i];
                 // The runtime loads assemblies into an isolated context by default. As a result,
                 // assemblies that are loaded via Assembly.Load aren't available in the app's context
                 // AKA the default context. To work around this, we explicitly load the assemblies
                 // into the default app context.
-                var loadedAssembly = AssemblyLoadContext.Default.LoadFromStream(new MemoryStream(assembly));
+                var loadedAssembly = AssemblyLoadContext.Default.LoadFromStream(new MemoryStream(assembly), new MemoryStream(pdb));
                 loadedAssemblies.Add(loadedAssembly);
                 _loadedAssemblyCache.Add(loadedAssembly.GetName().Name + ".dll");
             }

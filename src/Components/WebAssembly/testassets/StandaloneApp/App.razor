@@ -1,4 +1,10 @@
-﻿<Router AppAssembly=typeof(StandaloneApp.Program).Assembly>
+﻿@using Microsoft.AspNetCore.Components.Routing
+@using System.Reflection
+@using Microsoft.AspNetCore.Components.WebAssembly.Services
+
+@inject LazyAssemblyLoader lazyLoader
+
+<Router AppAssembly=typeof(StandaloneApp.Program).Assembly AdditionalAssemblies="@lazyLoadedAssemblies" OnNavigateAsync="@OnNavigateAsync">
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
     </Found>
@@ -9,3 +15,23 @@
         </LayoutView>
     </NotFound>
 </Router>
+
+@code {
+    private List<Assembly> lazyLoadedAssemblies = new List<Assembly>();
+
+    private async Task OnNavigateAsync(NavigationContext args)
+    {
+        Console.WriteLine($"Running OnNavigate for {args.Path}...");
+        await LoadAssemblies(args.Path);
+    }
+
+    private async Task LoadAssemblies(string uri)
+    {
+        if (uri.EndsWith("counter"))
+        {
+            Console.WriteLine($"Loading assemblies for WithLazyLoadedRoutes...");
+            var assemblies = await lazyLoader.LoadAssembliesAsync(new List<string>() { "TestContentPackage.dll" });
+            lazyLoadedAssemblies.AddRange(assemblies);
+        }
+    }
+}

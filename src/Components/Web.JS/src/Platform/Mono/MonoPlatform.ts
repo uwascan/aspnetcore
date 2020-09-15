@@ -354,19 +354,38 @@ function createEmscriptenModuleInstance(resourceLoader: WebAssemblyResourceLoade
         throw new Error(`${notMarked.join()} must be marked with 'BlazorWebAssemblyLazyLoad' item group in your project file to allow lazy-loading.`);
       }
 
+      let pdbPromises;
+      if (hasDebuggingEnabled()) {
+        const pdbs = resourceLoader.bootConfig.resources.pdb;
+        if (pdbs) {
+          const pdbsToLoad = assembliesMarkedAsLazy.map(assembly => changeExtension(assembly, '.pdb'));
+          pdbPromises = Promise.all(pdbsToLoad
+            .map(assembly => resourceLoader.loadResource(assembly, `_framework/${assembly}`, pdbs[assembly], 'pdb'))
+            .map(async resource => (await resource.response).arrayBuffer()));
+        }
+      }
+
       const resourcePromises = Promise.all(assembliesMarkedAsLazy
         .map(assembly => resourceLoader.loadResource(assembly, `_framework/${assembly}`, lazyAssemblies[assembly], 'assembly'))
         .map(async resource => (await resource.response).arrayBuffer()));
 
       return BINDING.js_to_mono_obj(
-        resourcePromises.then(resourcesToLoad => {
+        Promise.all([resourcePromises, pdbPromises]).then(values => {
+          const resourcesToLoad = values[0];
+          const pdbsToLoad = values[1];
           if (resourcesToLoad.length) {
             window['Blazor']._internal.readLazyAssemblies = () => {
-              const array = BINDING.mono_obj_array_new(resourcesToLoad.length);
+              const result = {
+                assemblies: BINDING.mono_obj_array_new(resourcesToLoad.length),
+                pdbs: BINDING.mono_obj_array_new(pdbsToLoad.length)
+              };
               for (var i = 0; i < resourcesToLoad.length; i++) {
-                BINDING.mono_obj_array_set(array, i, BINDING.js_typed_array_to_array(new Uint8Array(resourcesToLoad[i])));
+                BINDING.mono_obj_array_set(result.assemblies, i, BINDING.js_typed_array_to_array(new Uint8Array(resourcesToLoad[i])));
               }
-              return array;
+              for (var i = 0; i < pdbsToLoad.length; i++) {
+                BINDING.mono_obj_array_set(result.pdbs, i, BINDING.js_typed_array_to_array(new Uint8Array(pdbsToLoad[i])));
+              }
+              return BINDING.js_to_mono_obj(result);
             };
           }
 

@@ -9,6 +9,14 @@
     <Reference Include="System.Net.Http.Json" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../../../test/testassets/TestContentPackage/TestContentPackage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <BlazorWebAssemblyLazyLoad Include="TestContentPackage.dll" />
+  </ItemGroup>
+
   <!-- A bit of msbuild magic to support reference resolver tests -->
   <Target Name="CreateReferenceHintPathsList" AfterTargets="ResolveAssemblyReferences">
     <ItemGroup>
